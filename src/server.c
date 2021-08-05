@@ -62,29 +62,30 @@ static const struct option options[] = {{"port", required_argument, NULL, 'p'},
 #if LWS_LIBRARY_VERSION_NUMBER >= 4000000
                                         {"ping-interval", required_argument, NULL, 'P'},
 #endif
-                                        {"ipv6", no_argument, NULL, '6'},
-                                        {"ssl", no_argument, NULL, 'S'},
-                                        {"ssl-cert", required_argument, NULL, 'C'},
-                                        {"ssl-key", required_argument, NULL, 'K'},
-                                        {"ssl-ca", required_argument, NULL, 'A'},
-                                        {"url-arg", no_argument, NULL, 'a'},
-                                        {"readonly", no_argument, NULL, 'R'},
-                                        {"terminal-type", required_argument, NULL, 'T'},
-                                        {"client-option", required_argument, NULL, 't'},
-                                        {"check-origin", no_argument, NULL, 'O'},
-                                        {"max-clients", required_argument, NULL, 'm'},
-                                        {"once", no_argument, NULL, 'o'},
-                                        {"browser", no_argument, NULL, 'B'},
-                                        {"debug", required_argument, NULL, 'd'},
-                                        {"version", no_argument, NULL, 'v'},
-                                        {"help", no_argument, NULL, 'h'},
-                                        {NULL, 0, 0, 0}};
+    {"ipv6", no_argument, NULL, '6'},
+    {"ssl", no_argument, NULL, 'S'},
+    {"ssl-cert", required_argument, NULL, 'C'},
+    {"ssl-key", required_argument, NULL, 'K'},
+    {"ssl-ca", required_argument, NULL, 'A'},
+    {"url-arg", no_argument, NULL, 'a'},
+    {"arg-file", no_argument, NULL, 'f'},
+    {"readonly", no_argument, NULL, 'R'},
+    {"terminal-type", required_argument, NULL, 'T'},
+    {"client-option", required_argument, NULL, 't'},
+    {"check-origin", no_argument, NULL, 'O'},
+    {"max-clients", required_argument, NULL, 'm'},
+    {"once", no_argument, NULL, 'o'},
+    {"browser", no_argument, NULL, 'B'},
+    {"debug", required_argument, NULL, 'd'},
+    {"version", no_argument, NULL, 'v'},
+    {"help", no_argument, NULL, 'h'},
+    {NULL, 0, 0, 0}};
 
 #if LWS_LIBRARY_VERSION_NUMBER < 4000000
-static const char *opt_string = "p:i:c:u:g:s:I:b:6aSC:K:A:Rt:T:Om:oBd:vh";
+static const char *opt_string = "p:i:c:u:g:s:I:b:6afSC:K:A:Rt:T:Om:oBd:vh";
 #endif
 #if LWS_LIBRARY_VERSION_NUMBER >= 4000000
-static const char *opt_string = "p:i:c:u:g:s:I:b:P:6aSC:K:A:Rt:T:Om:oBd:vh";
+static const char *opt_string = "p:i:c:u:g:s:I:b:P:6afSC:K:A:Rt:T:Om:oBd:vh";
 #endif
 
 static void print_help() {
@@ -102,6 +103,7 @@ static void print_help() {
           "    -g, --gid               Group id to run with\n"
           "    -s, --signal            Signal to send to the command when exit it (default: 1, SIGHUP)\n"
           "    -a, --url-arg           Allow client to send command line arguments in URL (eg: http://localhost:7681?arg=foo&arg=bar)\n"
+          "    -f, --arg-file          Allow client to write URL arguments to a temporary file; the file name is then passed in as a command line argument\n"
           "    -R, --readonly          Do not allow clients to write to the TTY\n"
           "    -t, --client-option     Send option to client (format: key=value), repeat to add more options\n"
           "    -T, --terminal-type     Terminal type to report, default: xterm-256color\n"
@@ -326,6 +328,11 @@ int main(int argc, char **argv) {
         break;
       case 'a':
         server->url_arg = true;
+        server->arg_file = false;
+        break;
+      case 'f':
+        server->arg_file = true;
+        server->url_arg = false;
         break;
       case 'R':
         server->readonly = true;
@@ -527,7 +534,8 @@ int main(int argc, char **argv) {
     lwsl_notice("  websocket: %s\n", endpoints.ws);
   }
   if (server->check_origin) lwsl_notice("  check origin: true\n");
-  if (server->url_arg) lwsl_notice("  allow url arg: true\n");
+  if (server->url_arg) lwsl_notice("  allow url arg to cli arg: true\n");
+  if (server->arg_file) lwsl_notice("  allow url arg to tmp file: true\n");
   if (server->readonly) lwsl_notice("  readonly: true\n");
   if (server->max_clients > 0) lwsl_notice("  max clients: %d\n", server->max_clients);
   if (server->once) lwsl_notice("  once: true\n");
