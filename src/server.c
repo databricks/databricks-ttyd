@@ -73,6 +73,7 @@ static const struct option options[] = {
     {"ssl-key", required_argument, NULL, 'K'},
     {"ssl-ca", required_argument, NULL, 'A'},
     {"url-arg", no_argument, NULL, 'a'},
+    {"arg-file", required_argument, NULL, 'f'},
     {"readonly", no_argument, NULL, 'R'},
     {"terminal-type", required_argument, NULL, 'T'},
     {"client-option", required_argument, NULL, 't'},
@@ -86,10 +87,10 @@ static const struct option options[] = {
     {NULL, 0, 0, 0}};
 
 #if LWS_LIBRARY_VERSION_NUMBER < 4000000
-static const char *opt_string = "p:i:c:u:g:s:I:b:6aSC:K:A:Rt:T:Om:oBd:vh";
+static const char *opt_string = "p:i:c:u:g:s:I:b:6af:SC:K:A:Rt:T:Om:oBd:vh";
 #endif
 #if LWS_LIBRARY_VERSION_NUMBER >= 4000000
-static const char *opt_string = "p:i:c:u:g:s:I:b:P:6aSC:K:A:Rt:T:Om:oBd:vh";
+static const char *opt_string = "p:i:c:u:g:s:I:b:P:6af:SC:K:A:Rt:T:Om:oBd:vh";
 #endif
 
 static void print_help() {
@@ -107,6 +108,7 @@ static void print_help() {
           "    -g, --gid               Group id to run with\n"
           "    -s, --signal            Signal to send to the command when exit it (default: 1, SIGHUP)\n"
           "    -a, --url-arg           Allow client to send command line arguments in URL (eg: http://localhost:7681?arg=foo&arg=bar)\n"
+          "    -f, --arg-file          File prefix for a unique generated temp file that URL arguments are written to (ex. /tmp/prefix); the generated file's full path is then passed in as a command line argument (ex. /tmp/prefix{unique string})\n"
           "    -R, --readonly          Do not allow clients to write to the TTY\n"
           "    -t, --client-option     Send option to client (format: key=value), repeat to add more options\n"
           "    -T, --terminal-type     Terminal type to report, default: xterm-256color\n"
@@ -184,6 +186,7 @@ static struct server *server_new(int argc, char **argv, int start) {
 
 static void server_free(struct server *ts) {
   if (ts == NULL) return;
+  if (ts->arg_file != NULL) free(ts->arg_file);
   if (ts->credential != NULL) free(ts->credential);
   if (ts->index != NULL) free(ts->index);
   free(ts->command);
@@ -318,6 +321,11 @@ int main(int argc, char **argv) {
         break;
       case 'a':
         server->url_arg = true;
+        server->arg_file = NULL;
+        break;
+      case 'f':
+        server->arg_file = strdup(optarg);
+        server->url_arg = false;
         break;
       case 'R':
         server->readonly = true;
@@ -534,7 +542,8 @@ int main(int argc, char **argv) {
     lwsl_notice("  websocket: %s\n", endpoints.ws);
   }
   if (server->check_origin) lwsl_notice("  check origin: true\n");
-  if (server->url_arg) lwsl_notice("  allow url arg: true\n");
+  if (server->url_arg) lwsl_notice("  allow url arg to cli arg: true\n");
+  if (server->arg_file != NULL) lwsl_notice("  temp file name prefix: %s\n", server->arg_file);
   if (server->readonly) lwsl_notice("  readonly: true\n");
   if (server->max_clients > 0)
     lwsl_notice("  max clients: %d\n", server->max_clients);
