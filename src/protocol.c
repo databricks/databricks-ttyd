@@ -175,9 +175,35 @@ static int spawn_process(struct pss_tty *pss) {
   for (i = 0; i < server->argc; i++) {
     argv[n++] = server->argv[i];
   }
-  for (i = 0; i < proc->argc; i++) {
-    argv[n++] = proc->args[i];
+  if (server->url_arg) {
+    for (i = 0; i < proc->argc; i++) {
+      argv[n++] = proc->args[i];
+    }
+  } else if (server->arg_file != NULL) {
+    int fd = -1;
+    int file_path_len = strlen(server->arg_file) + 6 /*XXXXXX*/ + 1 /*null character*/;
+    char *filePath = xmalloc(file_path_len);
+    snprintf(filePath, file_path_len, "%sXXXXXX", server->arg_file);
+
+    if ((fd = mkstemp(filePath)) != -1) {
+      lwsl_err("Creation of temp file failed with error: %d (%s)\n", errno, strerror(errno));
+      return false;
+    }
+
+    for (i = 0; i < pss->argc; i++) {
+      if (dprintf(fd, "%s\n", pss->args[i]) < 0) {
+        lwsl_err("Write to temp file failed with error: %d (%s)\n", errno, strerror(errno));
+        return false;
+      }
+    }
+
+    if (close(fd) != 0) {
+      lwsl_err("Close temp file failed with error: %d (%s)\n", errno, strerror(errno));
+      return false
+    }
+    argv[n++] = filePath;
   }
+
   argv[n] = NULL;
 
   uv_signal_start(&server->watcher, child_cb, SIGCHLD);
@@ -270,7 +296,7 @@ int callback_tty(struct lws *wsi, enum lws_callback_reasons reason, void *user, 
       proc->state = STATE_INIT;
       uv_pipe_init(server->loop, &proc->pipe, 0);
 
-      if (server->url_arg) {
+      if (server->url_arg || server->arg_file != NULL) {
         while (lws_hdr_copy_fragment(wsi, buf, sizeof(buf), WSI_TOKEN_HTTP_URI_ARGS, n++) > 0) {
           if (strncmp(buf, "arg=", 4) == 0) {
             proc->args = xrealloc(proc->args, (proc->argc + 1) * sizeof(char *));
